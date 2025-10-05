@@ -104,12 +104,16 @@ boot  etc  lib   media  opt  root  sbin  sys  usr
 ```
 bin, dev, home, lib64 등등 ubuntu컨테이너가 사용할 rootfs가 있습니다. ubuntu 이미지를 베이스 이미지로 직접 만든 어플리케이션을 COPY로 집어넣었다면, 여기에 어플리케이션 실행을 위한 바이너리가 들어가고, config.json에는 그를 실행하기 위한 커맨드를 CMD, ENTRYPOINT등에서 정의한 프로세스가 정의될 것 입니다.
 
-본론으로 돌아와서, runc 스펙에 맞게 이를 구현하는 방법은 아래와 같습니다.
+본론으로 돌아와서, create 명령은 이러한 번들 디렉터리와 컨테이너 아이디를 받아 컨테이너 프로세스를 준비합니다.
+
+이 시점에서는 config.json에 명시되어있는 **process 항목을 제외**하고 그 외의 부분들을 준비합니다. process의 경우 사용자가 지정한 프로   그램으로, 이후 `start`단계에서 실행되어야 합니다
+
+runc 스펙에 맞게 이를 구현하는 방법은 아래와 같습니다.
 ```bash
-containeruntime create <container-id> --bundle <bundle-directory>
+gosudacon create <container-id> --bundle <bundle-directory>
 ```
 
-간단하게 코드로 보면 이렇습니다.
+urfave/cli를 이용해 더미만 구현해봅시다.
 
 `cmd/main.go`
 ```go
@@ -159,8 +163,16 @@ func main() {
 }
 ```
 
-- start
-- state
-- kill
-- delete
+**start**
+
+start 명령은 사용자가 지정해준 프로그램을 실행합니다. config.json의 process 영역에 해당하는 부분입니다.
+```go
+gosudacon start <container-id>
+```
+
+**state**
+
+**kill**
+
+**delete**
 
