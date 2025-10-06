@@ -1,6 +1,10 @@
 ---
+id: 353af9b84ad5c925738afc7fa2d93bf5
 author: yoonhyunwoo
 title: DIY(Do It Yourself) 컨테이너 런타임
+language: ko
+date: 2025-10-06T00:35:46.06301Z
+path: /blog/posts/diy(do-it-yourself)-컨테이너-런타임-z92433dc5
 ---
 
 ## 컨테이너 런타임(Container runtime)
@@ -18,14 +22,14 @@ OCI Runtime spec은 [opencontainers/runtime-spec](https://github.com/opencontain
 
 고수준 컨테이너 런타임들은 위 스펙을 구현한 프로그램을 CLI(Command Line Interface) 형태로 호출해서 사용하고는 하는데, 문제는 스펙이 정확한 CLI 구성 지침을 제공하는 것이 아니라는 겁니다. 
 
-이를테면 create command는 container-id와 bundle_path을 입력받아 실행하는데, 이것을 환경변수, 플래그, 아규먼트등 어떤 수단으로 입력받을지까지 정의해주지는 않습니다. 본 구현의 최종 목표는 containerd에 런타임을 통합시키는 작업이기 때문에 이런 스펙은 runc, crun등의 런타임과 동일하게 맞춥니다.
+이를테면 create command는 container_id와 bundle_path을 입력받아 실행하는데, 이것을 환경변수, 플래그, 아규먼트등 어떤 수단으로 입력받을지까지 정의해주지는 않습니다. 본 구현의 최종 목표는 containerd에 런타임을 통합시키는 작업이기 때문에 이런 스펙은 runc, crun등의 런타임과 동일하게 맞춥니다.
 
 ## 1. CLI 구현
 CLI 명령어를 살펴보며 컨테이너 런타임의 동작 순서에 대해 간단하게 알아보겠습니다.
 
 [runtime-spec/runtime.md](https://github.com/opencontainers/runtime-spec/blob/main/runtime.md)에서 구현해야 할 정보에 대해 알 수 있습니다. 이에 대해 각각의 명령어를 동작방식과 함께 알아보겠습니다.
 
-**create \<container-id> \<path-to-bundle>**
+**create \<container_id> \<path-to-bundle>**
 
 create 명령은 컨테이너 식별자와 번들 디렉터리를 입력받아 컨테이너를 생성합니다.
 번들 디렉터리(컨테이너 번들)은 그 컨테이너가 시작되기 위해 필요한 정보를 지닙니다.
@@ -110,7 +114,7 @@ bin, dev, home, lib64 등등 ubuntu컨테이너가 사용할 rootfs가 있습니
 
 runc 스펙에 맞게 이를 구현하는 방법은 아래와 같습니다.
 ```bash
-gosudacon create <container-id> --bundle <bundle-directory>
+gosudacon create <container_id> --bundle <bundle-directory>
 ```
 
 urfave/cli를 이용해 더미만 구현해봅시다.
@@ -132,7 +136,7 @@ import (
 var createCommand = &cli.Command{
 	Name:      "create",
 	Usage:     "create container",
-	ArgsUsage: "<container-id>", 
+	ArgsUsage: "<container_id>", 
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:     "bundle",
@@ -163,16 +167,134 @@ func main() {
 }
 ```
 
-**start**
+아래 명령부터는 빠르게 설명하겠습니다.
 
-start 명령은 사용자가 지정해준 프로그램을 실행합니다. config.json의 process 영역에 해당하는 부분입니다.
+**start**
 ```go
-gosudacon start <container-id>
+gosudacon start <container_id>
 ```
+start 명령은 사용자가 지정해준 프로그램을 실행합니다. config.json의 process 영역에 해당하는 부분입니다.
+
 
 **state**
+```go
+gosudacon start <container_id>
+```
+지정된 컨테이너의 상태와 구성정보를 json 형식으로 반환합니다.
 
 **kill**
+```go
+gosudacon kill <container_id> <signal>
+```
+실행중인 컨테이너에 Signal을 보냅니다.
 
 **delete**
+```go
+gosudacon delete <container_id>
+```
+정지된 컨테이너를 제거합니다.
 
+CLI 명령어들이 들어간 전체 코드는 아래와 같습니다.
+
+`cmd/main.go`
+```go
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+
+	"github.com/urfave/cli/v3"
+)
+
+var createCommand = &cli.Command{
+	Name:      "create",
+	Usage:     "create container",
+	ArgsUsage: "<container-id>",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:     "bundle",
+			Usage:    "Path to the bundle directory containing container configuration",
+			Required: true,
+			Aliases:  []string{"b"},
+		},
+	},
+	Action: func(ctx context.Context, command *cli.Command) error {
+		containerID := command.Args().First()
+		bundlePath := command.String("bundle")
+		_ = bundlePath
+		_ = containerID
+		log.Printf("Creating container: %s", containerID)
+		return nil
+	},
+}
+
+var startCommand = &cli.Command{
+	Name:      "start",
+	Usage:     "start container",
+	ArgsUsage: "<container-id>",
+	Action: func(ctx context.Context, command *cli.Command) error {
+		containerID := command.Args().First()
+		_ = containerID
+		log.Printf("Starting container: %s", containerID)
+		return nil
+	},
+}
+
+var stateCommand = &cli.Command{
+	Name:      "state",
+	Usage:     "get container state",
+	ArgsUsage: "<container-id>",
+	Action: func(ctx context.Context, command *cli.Command) error {
+		containerID := command.Args().First()
+		_ = containerID
+		log.Printf("Getting state for container: %s", containerID)
+		return nil
+	},
+}
+
+var killCommand = &cli.Command{
+	Name:      "kill",
+	Usage:     "kill container by sending a signal",
+	ArgsUsage: "<container-id> <signal>",
+	Action: func(ctx context.Context, command *cli.Command) error {
+		containerID := command.Args().Get(0)
+		signal := command.Args().Get(1)
+		_ = containerID
+		_ = signal
+		log.Printf("Killing container %s with signal %s", containerID, signal)
+		return nil
+	},
+}
+
+var deleteCommand = &cli.Command{
+	Name:      "delete",
+	Usage:     "delete container",
+	ArgsUsage: "<container-id>",
+	Action: func(ctx context.Context, command *cli.Command) error {
+		containerID := command.Args().First()
+		_ = containerID
+		log.Printf("Deleting container: %s", containerID)
+		return nil
+	},
+}
+
+func main() {
+	rootCmd := &cli.Command{
+		Name:  "gosudacon",
+		Usage: "A simple container runtime in Go",
+		Commands: []*cli.Command{
+			createCommand,
+			startCommand,
+			stateCommand,
+			killCommand,
+			deleteCommand,
+		},
+	}
+
+	if err := rootCmd.Run(context.Background(), os.Args); err != nil {
+		log.Fatal(err)
+	}
+}
+```
